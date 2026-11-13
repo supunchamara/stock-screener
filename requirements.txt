@@ -1,0 +1,7 @@
+streamlit
+yfinance
+pandas
+requests
+lxml
+sqlalchemy
+psycopg2-binary

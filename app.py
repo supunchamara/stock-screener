@@ -95,20 +95,43 @@ def read_prices():
         return None
 
 
+# ---------- Rule defaults and reset ----------
+DEFAULTS = {"days": 5, "mode": "High - Low (full range)", "max_range": 2.0,
+            "min_price": 1.0, "max_price": 0.0, "min_vol": 100_000,
+            "name_filter": ""}
+for _k, _v in DEFAULTS.items():
+    st.session_state.setdefault(_k, _v)
+
+
+def reset_rules():
+    for k, v in DEFAULTS.items():
+        st.session_state[k] = v
+
+
 # ---------- Sidebar ----------
 with st.sidebar:
     st.header("Rules")
     with st.form("rules"):
-        days = st.slider("Look-back (trading days)", 2, 20, 5)
-        mode = st.radio("Range type", ["High - Low (full range)", "Close to Close"])
-        max_range = st.number_input("Max range in $", 0.0, 1000.0, 2.0, 0.25)
-        min_price = st.number_input("Min last price $", 0.0, 100000.0, 1.0, 0.5)
+        days = st.slider("Look-back (trading days)", 2, 20, key="days")
+        mode = st.radio("Range type", ["High - Low (full range)", "Close to Close"],
+                        key="mode")
+        max_range = st.number_input("Max range in $", min_value=0.0,
+                                    max_value=1000.0, step=0.25, key="max_range")
+        min_price = st.number_input("Min last price $", min_value=0.0,
+                                    max_value=100000.0, step=0.5, key="min_price")
         max_price = st.number_input("Max last price $ (0 = no limit)",
-                                    0.0, 100000.0, 0.0, 1.0)
-        min_vol = st.number_input("Min avg daily volume", 0, 100_000_000,
-                                  100_000, 50_000)
-        name_filter = st.text_input("Ticker contains (optional)").upper()
-        st.form_submit_button("Apply")
+                                    min_value=0.0, max_value=100000.0, step=1.0,
+                                    key="max_price")
+        min_vol = st.number_input("Min avg daily volume", min_value=0,
+                                  max_value=100_000_000, step=50_000,
+                                  key="min_vol")
+        name_filter = st.text_input("Ticker contains (optional)",
+                                    key="name_filter").upper()
+        b1, b2 = st.columns(2)
+        with b1:
+            st.form_submit_button("Apply")
+        with b2:
+            st.form_submit_button("Clear", on_click=reset_rules)
 
     st.divider()
     st.header("Data")

@@ -177,8 +177,15 @@ st.download_button("Download results (CSV)", res.to_csv().encode(),
 if len(res):
     st.subheader("Details")
     t = st.selectbox("Pick a stock", res.index.tolist())
-    hist = prices[prices["Ticker"] == t].sort_values("Date")
-    st.line_chart(hist.set_index("Date")[["Close", "High", "Low"]])
+    hist = prices[prices["Ticker"] == t].sort_values("Date").tail(days)
+    lo, hi = hist["Low"].min(), hist["High"].max()
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Lowest price", f"${lo:.2f}")
+    m2.metric("Highest price", f"${hi:.2f}")
+    m3.metric("Range (high - low)", f"${hi - lo:.2f}")
+    m4.metric("Last close", f"${hist['Close'].iloc[-1]:.2f}")
+    st.caption("Closing price for each day")
+    st.line_chart(hist.set_index("Date")["Close"])
     st.dataframe(hist.drop(columns="Ticker").round(2), use_container_width=True)
     try:
         info = yf.Ticker(t).info

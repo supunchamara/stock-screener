@@ -146,6 +146,7 @@ with st.sidebar:
                 st.success("Data saved.")
                 st.rerun()
     st.caption(f"Storage: {db_label}")
+    st.caption("App version 4 (lookup + clear)")
 
 # ---------- Screening ----------
 prices = read_prices()
@@ -155,6 +156,43 @@ if prices is None or prices.empty:
 
 st.caption(f"Data up to {prices['Date'].max().date()} - "
            f"{prices['Ticker'].nunique()} stocks stored")
+
+def show_details(t, days):
+    hist = prices[prices["Ticker"] == t].sort_values("Date").tail(days)
+    lo, hi = hist["Low"].min(), hist["High"].max()
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Lowest price", f"${lo:.2f}")
+    m2.metric("Highest price", f"${hi:.2f}")
+    m3.metric("Range (high - low)", f"${hi - lo:.2f}")
+    m4.metric("Last close", f"${hist['Close'].iloc[-1]:.2f}")
+    st.caption("Closing price for each day")
+    st.line_chart(hist.set_index("Date")["Close"])
+    st.dataframe(hist.drop(columns="Ticker").round(2), use_container_width=True)
+    try:
+        info = yf.Ticker(t).info
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Company", info.get("longName", "-"))
+        c2.metric("Sector", info.get("sector", "-"))
+        c3.metric("Price", info.get("currentPrice", "-"))
+        c1.metric("Market cap", f"{info.get('marketCap', 0):,}")
+        c2.metric("P/E", info.get("trailingPE", "-"))
+        c3.metric("Dividend yield", info.get("dividendYield", "-"))
+        c1.metric("52w low", info.get("fiftyTwoWeekLow", "-"))
+        c2.metric("52w high", info.get("fiftyTwoWeekHigh", "-"))
+    except Exception:
+        st.warning("Could not load company details from Yahoo.")
+
+
+st.subheader("Look up any stock")
+st.caption("Shows one stock whatever the rules are. Example: NVDA")
+lookup = st.text_input("Ticker", key=f"lookup_{ver}").strip().upper()
+if lookup:
+    if (prices["Ticker"] == lookup).any():
+        show_details(lookup, days)
+    else:
+        st.warning(f"{lookup} is not in the downloaded data. Check the spelling, "
+                   "or click Download / refresh data.")
+st.divider()
 
 recent = prices.sort_values("Date").groupby("Ticker").tail(days)
 g = recent.groupby("Ticker")
@@ -190,30 +228,16 @@ st.dataframe(res, use_container_width=True)
 st.download_button("Download results (CSV)", res.to_csv().encode(),
                    "results.csv", "text/csv")
 
-# ---------- Details ----------
+# ---------- Why is my search empty? ----------
+if name_filter and len(res) == 0:
+    exists = prices["Ticker"].str.contains(name_filter, regex=False).any()
+    if exists:
+        st.info(f"'{name_filter}' is in the data, but it does not meet your rules "
+                "(for example the max $ range). Use 'Look up any stock' above, "
+                "or press Clear.")
+
+# ---------- Details of matched stocks ----------
 if len(res):
     st.subheader("Details")
     t = st.selectbox("Pick a stock", res.index.tolist())
-    hist = prices[prices["Ticker"] == t].sort_values("Date").tail(days)
-    lo, hi = hist["Low"].min(), hist["High"].max()
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Lowest price", f"${lo:.2f}")
-    m2.metric("Highest price", f"${hi:.2f}")
-    m3.metric("Range (high - low)", f"${hi - lo:.2f}")
-    m4.metric("Last close", f"${hist['Close'].iloc[-1]:.2f}")
-    st.caption("Closing price for each day")
-    st.line_chart(hist.set_index("Date")["Close"])
-    st.dataframe(hist.drop(columns="Ticker").round(2), use_container_width=True)
-    try:
-        info = yf.Ticker(t).info
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Company", info.get("longName", "-"))
-        c2.metric("Sector", info.get("sector", "-"))
-        c3.metric("Price", info.get("currentPrice", "-"))
-        c1.metric("Market cap", f"{info.get('marketCap', 0):,}")
-        c2.metric("P/E", info.get("trailingPE", "-"))
-        c3.metric("Dividend yield", info.get("dividendYield", "-"))
-        c1.metric("52w low", info.get("fiftyTwoWeekLow", "-"))
-        c2.metric("52w high", info.get("fiftyTwoWeekHigh", "-"))
-    except Exception:
-        st.warning("Could not load company details from Yahoo.")
+    show_details(t, days)
